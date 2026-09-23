@@ -1,0 +1,433 @@
+/* ==========================================================================
+   MapLibre Clean Real Map Styling
+   Ensures the real geographic map (streets, roads, terrain, labels) is
+   100% natural, crisp, bright, and completely unfiltered.
+   ========================================================================== */
+
+.maplibre-container {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* REAL MAP: Zero inversion, natural colors, high contrast */
+.maplibre-container .maplibregl-canvas-container,
+.maplibre-container .maplibregl-canvas,
+.maplibregl-canvas {
+  width: 100%;
+  height: 100%;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Clear transparent overlay so real map shines through */
+.map-canvas-grid-overlay {
+  display: none !important;
+}
+
+.map-grid-overlay {
+  display: none !important;
+}
+
+/* Markers tuned for high visibility on real geographic maps */
+.maplibre-custom-marker-wrapper {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tactical-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.35));
+}
+
+.marker-label {
+  position: absolute;
+  top: calc(100% + 2px);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+/* Drone Marker */
+.drone-marker .drone-aircraft-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #0284c7;
+  box-shadow: 0 0 14px rgba(2, 132, 199, 0.6), 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.4s ease;
+}
+
+.aircraft-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.drone-label {
+  background: #0284c7;
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+}
+
+/* Survivor Marker & Critical Glow Ring */
+.survivor-marker .survivor-core-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--survivor-color, #ef4444);
+  box-shadow: 0 0 12px var(--survivor-color, #ef4444), 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--survivor-color, #ef4444);
+}
+
+.survivor-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.critical-survivor-ring {
+  position: relative;
+}
+
+.critical-outer-glow-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2.5px solid #ef4444;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+  animation: critical-ring-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes critical-ring-pulse {
+  0% { transform: scale(0.9); opacity: 0.95; }
+  50% { transform: scale(1.3); opacity: 0.35; }
+  100% { transform: scale(0.9); opacity: 0.95; }
+}
+
+.survivor-label {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #f87171;
+}
+
+/* Hazard Marker */
+.hazard-marker .hazard-diamond {
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
+  border: 2px solid var(--hazard-color, #f59e0b);
+  box-shadow: 0 0 10px var(--hazard-color, #f59e0b), 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hazard-svg {
+  width: 18px;
+  height: 18px;
+  transform: rotate(-45deg);
+  stroke: var(--hazard-color, #f59e0b);
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.hazard-label {
+  background: #d97706;
+  color: #ffffff;
+  border: 1px solid #fbbf24;
+}
+
+/* Rescue Team Marker */
+.team-marker .team-shield-core {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 2px solid #059669;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6), 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.team-label {
+  background: #059669;
+  color: #ffffff;
+  border: 1px solid #34d399;
+}
+
+/* ==========================================================================
+   Projected UAV Video Detection Pins on Satellite Map
+   ========================================================================== */
+
+.projected-pin-wrapper {
+  z-index: 28;
+}
+
+.projected-uav-pin {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.projected-uav-pin:hover {
+  transform: scale(1.18);
+  z-index: 40;
+}
+
+.projected-pin-radar {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+  animation: projected-radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+  top: -7px;
+}
+
+@keyframes projected-radar-ping {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  75%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+.projected-pin-core {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.92);
+  border: 2px solid #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.projected-uav-pin.is-selected .projected-pin-core {
+  border-color: #38bdf8;
+  background: #0284c7;
+  box-shadow: 0 0 22px rgba(56, 189, 248, 1), 0 0 8px #ffffff;
+}
+
+.pin-crosshair-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.projected-pin-pill {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pin-id-tag {
+  color: #00f0ff;
+}
+
+.pin-temp-tag {
+  color: #fbbf24;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  padding-left: 3px;
+}
+
+/* Floating Projected Target Card on Live Map */
+.floating-projected-card {
+  position: absolute;
+  top: 72px;
+  left: 16px;
+  z-index: 35;
+  background: rgba(11, 19, 38, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 240, 255, 0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 290px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: projected-card-fade-in 0.25s ease-out;
+}
+
+@keyframes projected-card-fade-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.projected-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.projected-header-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #00f0ff;
+}
+
+.projected-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+.projected-close-btn:hover {
+  color: #ffffff;
+}
+
+.projected-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.projected-title-row strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.02em;
+}
+
+.projected-conf-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(0, 240, 255, 0.15);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+}
+
+.projected-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.projected-spec-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projected-spec-col small {
+  font-size: 8px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.04em;
+}
+
+.projected-spec-col span,
+.projected-spec-col strong {
+  font-size: 10.5px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #e2e8f0;
+}
+
+.projected-actions-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.projected-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.projected-action-btn.dispatch-action {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.projected-action-btn.dispatch-action:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  transform: translateY(-1px);
+}
+
+.projected-action-btn.vitals-action {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #00f0ff;
+}
+
+.projected-action-btn.vitals-action:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: #00f0ff;
+  transform: translateY(-1px);
+}
+

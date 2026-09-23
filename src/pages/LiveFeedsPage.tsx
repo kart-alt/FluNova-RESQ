@@ -1,0 +1,6 @@
+import { Camera, Circle, Maximize2, SlidersHorizontal } from 'lucide-react'
+import { CameraFeed } from '../components/feeds/CameraFeed'
+import { OdometryView } from '../components/feeds/OdometryView'
+import { SectionLabel } from '../components/ui/Primitives'
+
+export function LiveFeedsPage() { return <div className="secondary-page live-feeds-page"><div className="page-heading"><div><SectionLabel>LIVE PERCEPTION / DRONE D1</SectionLabel><h1>Live sensor feeds</h1><p>Evidence streams synchronized with the selected operational object.</p></div><div className="page-actions"><button><Camera size={15}/> D1 · EAGLE ONE</button><button><SlidersHorizontal size={15}/> AI OVERLAYS</button><button className="record"><Circle size={10} fill="currentColor"/> RECORD</button></div></div><div className="large-feeds"><CameraFeed type="RGB"/><CameraFeed type="THERMAL"/></div><div className="feed-support"><OdometryView/><section className="feed-checks"><div><Maximize2 size={17}/><b>Evidence controls</b><p>Camera, snapshot and overlay states are simulated for Mission #042.</p></div><label><input defaultChecked type="checkbox"/> PERSON DETECTIONS</label><label><input defaultChecked type="checkbox"/> HAZARD DETECTIONS</label><label><input defaultChecked type="checkbox"/> THERMAL SIGNATURES</label></section></div></div> }

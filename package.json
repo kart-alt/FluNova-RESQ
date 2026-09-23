@@ -1,0 +1,32 @@
+{
+  "name": "flynova-gcs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "detector:server": "python server/yolo_detector_server.py",
+    "build": "tsc -b && vite build",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "latest",
+    "maplibre-gl": "^6.9.0",
+    "onnxruntime-web": "^1.30.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "^7.18.3",
+    "recharts": "^3.10.1",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}
