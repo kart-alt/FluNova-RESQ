@@ -156,7 +156,11 @@ class QualcommOnnxDetector {
     // Initialize in-browser ONNX session
     try {
       ort.env.wasm.wasmPaths = '/onnx/'
-      ort.env.wasm.numThreads = 1
+      if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) {
+        ort.env.wasm.numThreads = Math.min(4, typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 2) : 2)
+      } else {
+        ort.env.wasm.numThreads = 1
+      }
 
       const options: ort.InferenceSession.SessionOptions = {
         executionProviders: ['wasm'],
@@ -215,7 +219,7 @@ class QualcommOnnxDetector {
     try {
       const naturalW = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth
       const naturalH = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight
-      const targetW = Math.min(960, naturalW || 960)
+      const targetW = Math.min(480, naturalW || 480)
       const targetH = Math.round((targetW / (naturalW || 16)) * (naturalH || 9))
 
       if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
@@ -229,7 +233,7 @@ class QualcommOnnxDetector {
       if (this.serverOnline) {
         try {
           const blob = await new Promise<Blob | null>(resolve => {
-            this.canvas!.toBlob(resolve, 'image/jpeg', 0.80)
+            this.canvas!.toBlob(resolve, 'image/jpeg', 0.55)
           })
 
           if (blob) {
@@ -237,7 +241,7 @@ class QualcommOnnxDetector {
               method: 'POST',
               headers: { 'Content-Type': 'image/jpeg' },
               body: blob,
-              signal: AbortSignal.timeout(800)
+              signal: AbortSignal.timeout(600)
             })
 
             if (resp.ok) {
@@ -327,12 +331,13 @@ class QualcommOnnxDetector {
 
     const floatArr = this.tensorDataBuffer
     const planeSize = 640 * 640
+    const inv255 = 1.0 / 255.0
 
     for (let i = 0; i < planeSize; i++) {
       const idx = i * 4
-      floatArr[i] = data[idx] / 255.0
-      floatArr[planeSize + i] = data[idx + 1] / 255.0
-      floatArr[planeSize * 2 + i] = data[idx + 2] / 255.0
+      floatArr[i] = data[idx] * inv255
+      floatArr[planeSize + i] = data[idx + 1] * inv255
+      floatArr[planeSize * 2 + i] = data[idx + 2] * inv255
     }
 
     return new ort.Tensor('float32', floatArr, [1, 3, 640, 640])

@@ -104,8 +104,8 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
       } finally {
         isProcessing = false
         if (isMounted) {
-          // If video is playing, check next frame in ~100ms; if paused or static, check every ~500ms
-          const delay = videoPlaying ? 100 : 500
+          // If video is playing, check next frame in ~16ms (real-time stream); if paused or static, check every ~400ms
+          const delay = videoPlaying ? 16 : 400
           timerId = setTimeout(runInference, delay)
         }
       }
