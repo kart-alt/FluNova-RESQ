@@ -21,7 +21,7 @@ import {
   VolumeX,
   Cpu,
 } from 'lucide-react'
-import { useCommandStore } from '../../store/commandStore'
+import { useCommandStore, DEFAULT_VIDEO_URL, DEFAULT_VIDEO_NAME } from '../../store/commandStore'
 import { generateSampleReconVideo } from '../../utils/generateSampleVideo'
 import { qualcommDetector } from '../../utils/qualcommOnnxDetector'
 
@@ -173,7 +173,15 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
 
   const resetFeed = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setUploadedVideo(null, null)
+    if (uploadedVideoUrl !== DEFAULT_VIDEO_URL) {
+      setUploadedVideo(DEFAULT_VIDEO_URL, DEFAULT_VIDEO_NAME)
+      setVideoPlaying(true)
+    } else {
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0
+        void videoRef.current.play().catch(() => {})
+      }
+    }
   }
 
   const loadDemoVideo = async (e: React.MouseEvent) => {
@@ -222,7 +230,7 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
           {uploadedVideoUrl ? (
             <span className={`feed-status-pill ${type === 'RGB' ? 'recording video-pill' : 'active-thermal video-pill'}`}>
               <span className={type === 'RGB' ? 'record-red-dot' : 'thermal-purple-dot'} />
-              SYNCHRONIZED FEED
+              {uploadedVideoUrl === DEFAULT_VIDEO_URL ? 'DEFAULT UAV STREAM' : 'SYNCHRONIZED FEED'}
             </span>
           ) : (
             <span className={`feed-status-pill ${type === 'RGB' ? 'recording' : 'active-thermal'}`}>
@@ -279,11 +287,28 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
               e.stopPropagation()
               fileInputRef.current?.click()
             }}
-            title="Upload your video file (MP4, WebM, MOV) to run both RGB & Thermal simultaneously"
+            title="Upload your custom video file (MP4, WebM, MOV) to run both RGB & Thermal simultaneously"
           >
             <Upload size={12} />
-            <span>{uploadedVideoUrl ? 'REPLACE' : 'UPLOAD VIDEO'}</span>
+            <span>{uploadedVideoUrl ? 'CHANGE VIDEO' : 'UPLOAD VIDEO'}</span>
           </button>
+
+          {/* Quick restore to default video if custom video is active */}
+          {uploadedVideoUrl !== DEFAULT_VIDEO_URL && (
+            <button
+              type="button"
+              className="feed-header-btn demo-video-btn"
+              onClick={e => {
+                e.stopPropagation()
+                setUploadedVideo(DEFAULT_VIDEO_URL, DEFAULT_VIDEO_NAME)
+                setVideoPlaying(true)
+              }}
+              title="Restore default drone video (mipi_2_20260917143157.mp4)"
+            >
+              <RotateCcw size={12} />
+              <span>DEFAULT FEED</span>
+            </button>
+          )}
 
           {/* Quick Demo Video if not uploaded */}
           {!uploadedVideoUrl && (
@@ -322,7 +347,7 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
                 type="button"
                 className="feed-header-btn icon-only reset-btn"
                 onClick={resetFeed}
-                title="Reset to static aerial recon view"
+                title={uploadedVideoUrl !== DEFAULT_VIDEO_URL ? "Reset to default MIPI video stream" : "Restart video from beginning"}
               >
                 <RotateCcw size={12} />
               </button>

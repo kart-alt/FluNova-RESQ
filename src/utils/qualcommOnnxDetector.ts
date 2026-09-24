@@ -14,6 +14,7 @@ import type { Keypoint, Severity } from '../types'
 
 export interface DetectedObject {
   id: string
+  trackId?: number
   label: string
   classId: number
   className?: string

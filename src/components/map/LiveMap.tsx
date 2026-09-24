@@ -62,6 +62,9 @@ const hazardIcon = (type: Hazard['type']) => {
     ELECTRICAL: '<path d="m15 3-8 11h6l-1 7 8-12h-6l1-6Z"/>',
     'BLOCKED ROAD': '<path d="M8 4 5 20m12-16 3 16M9 12h6m-7 4h8"/>',
     'DAMAGED BRIDGE': '<path d="M4 19h16M6 19v-6c0-4 3-6 8-6s8 2 8 6v6M10 19v-4m8 4v-4"/>',
+    'ACTIVE DISTRESS SIGNAL': '<path d="m14 4 9 16H5L14 4Zm0 5v5m0 3v.1"/>',
+    'ENTRAPMENT RISK': '<path d="M5 21V9l9-5 5 3v14M5 21h15M9 21v-6h4v6m2-9h2m-2 3h2"/>',
+    'IMMOBILE / UNCONSCIOUS CASUALTY': '<path d="M14 3c1.8 4.2 5.5 5.7 5.5 10.1A5.5 5.5 0 1 1 8.6 9.5c.5 2.2 1.9 3.4 3.2 4.1C11.4 9.8 13.2 7 14 3Z"/>',
   }
   return paths[type]
 }

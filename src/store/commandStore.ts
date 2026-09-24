@@ -223,6 +223,9 @@ export const formatMissionTime = (seconds: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+export const DEFAULT_VIDEO_URL = '/mipi_2_20260917143157.mp4'
+export const DEFAULT_VIDEO_NAME = 'mipi_2_20260917143157.mp4'
+
 export const useCommandStore = create<CommandStore>((set, get) => ({
   drones: initialDrones,
   survivors: initialSurvivors,
@@ -232,8 +235,8 @@ export const useCommandStore = create<CommandStore>((set, get) => ({
   mission: initialMission,
   mapLayers: defaultLayers,
   expandedFeed: null,
-  uploadedVideoUrl: null,
-  uploadedVideoName: null,
+  uploadedVideoUrl: DEFAULT_VIDEO_URL,
+  uploadedVideoName: DEFAULT_VIDEO_NAME,
   mapStyleMode: 'SATELLITE',
   videoPlaying: true,
   followDrone: false,

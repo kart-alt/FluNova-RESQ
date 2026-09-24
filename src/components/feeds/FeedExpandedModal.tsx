@@ -9,6 +9,7 @@ import {
   Layers,
   Radio,
   ScanLine,
+  RotateCcw,
   Sliders,
   Thermometer,
   Upload,
@@ -17,7 +18,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useRef } from 'react'
-import { useCommandStore } from '../../store/commandStore'
+import { useCommandStore, DEFAULT_VIDEO_URL, DEFAULT_VIDEO_NAME } from '../../store/commandStore'
 
 export function FeedExpandedModal() {
   const expandedFeed = useCommandStore(state => state.expandedFeed)
@@ -72,6 +73,17 @@ export function FeedExpandedModal() {
                   <Upload size={12} />
                   <span>{uploadedVideoUrl ? 'CHANGE VIDEO' : 'UPLOAD VIDEO'}</span>
                 </button>
+                {uploadedVideoUrl !== DEFAULT_VIDEO_URL && (
+                  <button
+                    type="button"
+                    className="modal-upload-btn"
+                    onClick={() => setUploadedVideo(DEFAULT_VIDEO_URL, DEFAULT_VIDEO_NAME)}
+                    title="Restore default MIPI drone video stream"
+                  >
+                    <RotateCcw size={12} />
+                    <span>RESTORE DEFAULT</span>
+                  </button>
+                )}
               </>
             )}
             <span className="modal-status-badge">
@@ -245,15 +257,46 @@ export function FeedExpandedModal() {
 
             {expandedFeed === 'THERMAL' && (
               <div className="modal-media-wrapper thermal-modal-bg">
-                <div className="thermal-gradient-backdrop full-size" />
-                <div className="ambient-heat-field heat-1-lg" />
-                <div className="ambient-heat-field heat-2-lg" />
-                <div className="thermal-scanlines" />
+                {/* Embedded SVG Radiometric FLIR Ironbow Thermal Palette Filter */}
+                <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }} aria-hidden="true">
+                  <filter id="flir-ironbow-filter-modal" colorInterpolationFilters="sRGB">
+                    <feColorMatrix
+                      type="matrix"
+                      values="0.3333 0.3333 0.3333 0 0
+                              0.3333 0.3333 0.3333 0 0
+                              0.3333 0.3333 0.3333 0 0
+                              0      0      0      1 0"
+                    />
+                    <feComponentTransfer>
+                      <feFuncR type="table" tableValues="0.00 0.15 0.50 0.85 0.98 1.00 1.00" />
+                      <feFuncG type="table" tableValues="0.00 0.05 0.00 0.20 0.65 0.90 1.00" />
+                      <feFuncB type="table" tableValues="0.25 0.55 0.65 0.15 0.00 0.40 1.00" />
+                    </feComponentTransfer>
+                  </filter>
+                </svg>
 
-                <div className="thermal-human-signature-lg">
-                  <div className="heat-body-core-lg" />
-                  <div className="heat-halo-magenta-lg" />
-                </div>
+                {uploadedVideoUrl ? (
+                  <video
+                    src={uploadedVideoUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls
+                    className="modal-recon-img video-element thermal-vision-stream"
+                  />
+                ) : (
+                  <>
+                    <div className="thermal-gradient-backdrop full-size" />
+                    <div className="ambient-heat-field heat-1-lg" />
+                    <div className="ambient-heat-field heat-2-lg" />
+                    <div className="thermal-human-signature-lg">
+                      <div className="heat-body-core-lg" />
+                      <div className="heat-halo-magenta-lg" />
+                    </div>
+                  </>
+                )}
+                <div className="thermal-scanlines" />
 
                 <div className="thermal-targeting-box-lg">
                   <div className="thermal-bracket tl" />

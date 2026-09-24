@@ -50,3 +50,5 @@ wheels/
 # OS Files
 .DS_Store
 Thumbs.db
+
+vite.config.js
