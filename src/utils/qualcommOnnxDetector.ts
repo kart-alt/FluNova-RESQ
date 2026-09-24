@@ -86,6 +86,7 @@ class QualcommOnnxDetector {
   private currentFps = 30
   private lastInferenceTime = 24
   private lastDetections: DetectedObject[] = []
+  private missedFrames = 0
   private pingInterval: any = null
 
   public serverOnline = false
@@ -154,7 +155,7 @@ class QualcommOnnxDetector {
 
     // Initialize in-browser ONNX session
     try {
-      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/'
+      ort.env.wasm.wasmPaths = '/onnx/'
       ort.env.wasm.numThreads = 1
 
       const options: ort.InferenceSession.SessionOptions = {
@@ -163,14 +164,17 @@ class QualcommOnnxDetector {
       }
 
       if (typeof modelPathOrBuffer === 'string') {
-        this.session = await ort.InferenceSession.create(modelPathOrBuffer, options)
+        const resp = await fetch(modelPathOrBuffer)
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} loading model ${modelPathOrBuffer}`)
+        const buffer = await resp.arrayBuffer()
+        this.session = await ort.InferenceSession.create(new Uint8Array(buffer), options)
       } else {
         this.session = await ort.InferenceSession.create(new Uint8Array(modelPathOrBuffer), options)
       }
       this.isReady = true
       this.isInitializing = false
       if (!this.serverOnline) {
-        this.modelName = 'Qualcomm AI Hub YOLO26-Pose (Browser ONNX WebGL)'
+        this.modelName = 'Qualcomm AI Hub YOLO26-Pose (Browser ONNX Engine)'
       }
       console.log('✅ Qualcomm AI Hub YOLO26-Pose ONNX session initialized successfully')
       return true
@@ -272,9 +276,22 @@ class QualcommOnnxDetector {
 
             this.lastInferenceTime = Math.round(performance.now() - startTime)
             this.updateFps()
-            this.lastDetections = detections
-            this.isProcessingFrame = false
-            return detections
+
+            if (detections.length > 0) {
+              this.missedFrames = 0
+              this.lastDetections = detections
+              this.isProcessingFrame = false
+              return detections
+            } else if (this.missedFrames < 10 && this.lastDetections.length > 0) {
+              // Smooth track persistence across temporary aerial detection misses
+              this.missedFrames++
+              this.isProcessingFrame = false
+              return this.lastDetections
+            } else {
+              this.lastDetections = []
+              this.isProcessingFrame = false
+              return []
+            }
           }
         }
       }
@@ -354,7 +371,10 @@ class QualcommOnnxDetector {
         }
       }
 
-      if (maxScore >= confThreshold) {
+      // Aerial drone view adaptation: top-down person perspective has lower peak score in COCO models
+      const effectiveThreshold = maxClassId === 0 ? Math.min(confThreshold, 0.07) : confThreshold
+
+      if (maxScore >= effectiveThreshold) {
         const cx = outputData[0 * numCandidates + c]
         const cy = outputData[1 * numCandidates + c]
         const w = outputData[2 * numCandidates + c]

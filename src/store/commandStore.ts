@@ -473,7 +473,7 @@ export const useCommandStore = create<CommandStore>((set, get) => ({
   // Qualcomm AI Hub Detection Engine State
   activeDetections: [],
   onnxModelName: 'Qualcomm AI Hub YOLO26-Pose (Person & Pose)',
-  onnxConfidenceThreshold: 0.15,
+  onnxConfidenceThreshold: 0.08,
   onnxInferenceTimeMs: 24,
   onnxFps: 30,
   modelManagerOpen: false,
