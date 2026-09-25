@@ -78,12 +78,13 @@ const COCO_CLASSES = [
 ]
 
 class QualcommOnnxDetector {
+  private inputSize = 416
   private session: ort.InferenceSession | null = null
   private canvas: HTMLCanvasElement | null = null
   private ctx: CanvasRenderingContext2D | null = null
   private tensorCanvas: HTMLCanvasElement | null = null
   private tensorCtx: CanvasRenderingContext2D | null = null
-  private tensorDataBuffer = new Float32Array(3 * 640 * 640)
+  private tensorDataBuffer = new Float32Array(3 * 416 * 416)
 
   private isInitializing = false
   private isProcessingFrame = false
@@ -103,13 +104,13 @@ class QualcommOnnxDetector {
   constructor() {
     if (typeof document !== 'undefined') {
       this.canvas = document.createElement('canvas')
-      this.canvas.width = 960
-      this.canvas.height = 540
+      this.canvas.width = 480
+      this.canvas.height = 270
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
       this.tensorCanvas = document.createElement('canvas')
-      this.tensorCanvas.width = 640
-      this.tensorCanvas.height = 640
+      this.tensorCanvas.width = 416
+      this.tensorCanvas.height = 416
       this.tensorCtx = this.tensorCanvas.getContext('2d', { willReadFrequently: true })
 
       this.startServerPoller()
@@ -169,7 +170,7 @@ class QualcommOnnxDetector {
       }
 
       const options: ort.InferenceSession.SessionOptions = {
-        executionProviders: ['wasm'],
+        executionProviders: ['webgpu', 'wasm'],
         graphOptimizationLevel: 'all',
       }
 
@@ -326,17 +327,18 @@ class QualcommOnnxDetector {
   }
 
   /**
-   * Preprocesses canvas image into normalized [1, 3, 640, 640] tensor for ONNX runtime
+   * Preprocesses canvas image into normalized [1, 3, inputSize, inputSize] tensor for ONNX runtime
    */
   private preprocessCanvasToTensor(): ort.Tensor | null {
     if (!this.canvas || !this.tensorCanvas || !this.tensorCtx) return null
 
-    this.tensorCtx.drawImage(this.canvas, 0, 0, 640, 640)
-    const imgData = this.tensorCtx.getImageData(0, 0, 640, 640)
+    const size = this.inputSize
+    this.tensorCtx.drawImage(this.canvas, 0, 0, size, size)
+    const imgData = this.tensorCtx.getImageData(0, 0, size, size)
     const data = imgData.data
 
     const floatArr = this.tensorDataBuffer
-    const planeSize = 640 * 640
+    const planeSize = size * size
     const inv255 = 1.0 / 255.0
 
     for (let i = 0; i < planeSize; i++) {
@@ -346,20 +348,21 @@ class QualcommOnnxDetector {
       floatArr[planeSize * 2 + i] = data[idx + 2] * inv255
     }
 
-    return new ort.Tensor('float32', floatArr, [1, 3, 640, 640])
+    return new ort.Tensor('float32', floatArr, [1, 3, size, size])
   }
 
   /**
-   * Parses raw YOLOv8/YOLO-Pose output shape ([1, 56, 8400] or [1, 84, 8400]) and applies NMS.
+   * Parses raw YOLOv8/YOLO-Pose output shape ([1, 56, numCandidates] or [1, 84, numCandidates]) and applies NMS.
    */
   private postprocessYOLOv8(
     outputData: Float32Array,
     confThreshold: number,
     targetClassIds: number[]
   ): DetectedObject[] {
-    const numCandidates = 8400
-    const totalChannels = Math.round(outputData.length / numCandidates)
+    const totalChannels = outputData.length >= 8400 * 56 ? 56 : (outputData.length >= 3549 * 56 && outputData.length < 3549 * 84 ? 56 : (outputData.length % 56 === 0 ? 56 : 84))
+    const numCandidates = Math.round(outputData.length / totalChannels)
     const isPoseModel = totalChannels === 56
+    const normSize = this.inputSize || 416
 
     interface CandidateBox {
       x1: number
@@ -402,8 +405,8 @@ class QualcommOnnxDetector {
 
         const x1 = Math.max(0, cx - w / 2)
         const y1 = Math.max(0, cy - h / 2)
-        const x2 = Math.min(640, cx + w / 2)
-        const y2 = Math.min(640, cy + h / 2)
+        const x2 = Math.min(normSize, cx + w / 2)
+        const y2 = Math.min(normSize, cy + h / 2)
 
         candidates.push({
           x1,
@@ -440,10 +443,10 @@ class QualcommOnnxDetector {
     }
 
     return nmsResults.map((box, idx) => {
-      const leftPct = (box.x1 / 640) * 100
-      const topPct = (box.y1 / 640) * 100
-      const widthPct = ((box.x2 - box.x1) / 640) * 100
-      const heightPct = ((box.y2 - box.y1) / 640) * 100
+      const leftPct = (box.x1 / normSize) * 100
+      const topPct = (box.y1 / normSize) * 100
+      const widthPct = ((box.x2 - box.x1) / normSize) * 100
+      const heightPct = ((box.y2 - box.y1) / normSize) * 100
       const confPct = Math.min(99, Math.round(box.score * 100))
 
       let label = 'SURVIVOR [PERSON]'
@@ -468,8 +471,8 @@ class QualcommOnnxDetector {
           keypoints.push({
             id: k,
             name: KEYPOINT_NAMES[k] || `pt_${k}`,
-            x: Number(((kx / 640) * 100).toFixed(2)),
-            y: Number(((ky / 640) * 100).toFixed(2)),
+            x: Number(((kx / normSize) * 100).toFixed(2)),
+            y: Number(((ky / normSize) * 100).toFixed(2)),
             conf: Number(kc.toFixed(2)),
           })
         }

@@ -5583,7 +5583,8 @@ table td small {
   border: 1.8px solid #00f0ff;
   background: rgba(0, 240, 255, 0.06);
   box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
-  transition: all 0.12s ease-out;
+  transition: left 0.05s linear, top 0.05s linear, width 0.05s linear, height 0.05s linear;
+  will-change: left, top, width, height;
   pointer-events: none;
 }
 
@@ -5601,7 +5602,8 @@ table td small {
   border: 1.5px dashed #f59e0b;
   background: rgba(245, 158, 11, 0.08);
   box-shadow: 0 0 16px rgba(245, 158, 11, 0.45);
-  transition: all 0.12s ease-out;
+  transition: left 0.05s linear, top 0.05s linear, width 0.05s linear, height 0.05s linear;
+  will-change: left, top, width, height;
   pointer-events: none;
 }
 

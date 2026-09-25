@@ -56,6 +56,7 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+  const lastSyncRef = useRef<number>(0)
 
   const alt = Math.round(drone?.altitude ?? 121)
   const hdg = Math.round(drone?.heading ?? 135)
@@ -91,13 +92,19 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
         if (isMounted) {
           const list = detections ?? []
           setActiveDetections(list)
-          syncVideoDetectionsToStore(list)
-          const metrics = qualcommDetector.getMetrics()
-          setOnnxMetrics({
-            inferenceTimeMs: metrics.inferenceTimeMs,
-            fps: metrics.fps,
-            modelName: metrics.modelName,
-          })
+
+          // Throttle heavy global store updates (MapLibre re-render, alerts list) to 3x/sec
+          const now = performance.now()
+          if (now - lastSyncRef.current >= 300) {
+            lastSyncRef.current = now
+            syncVideoDetectionsToStore(list)
+            const metrics = qualcommDetector.getMetrics()
+            setOnnxMetrics({
+              inferenceTimeMs: metrics.inferenceTimeMs,
+              fps: metrics.fps,
+              modelName: metrics.modelName,
+            })
+          }
         }
       } catch (e) {
         console.warn('Frame detection error:', e)
