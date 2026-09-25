@@ -62,7 +62,7 @@ export function CameraFeed({ type }: { type: 'RGB' | 'THERMAL' }) {
 
   // Initialize Qualcomm detector on mount
   useEffect(() => {
-    void qualcommDetector.initialize('/models/yolov8n.onnx').catch(() => {})
+    void qualcommDetector.initialize('/models/yolov8n-pose.onnx').catch(() => {})
   }, [])
 
   // Run real-time detection loop on RGB feed (both uploaded video and static recon view)

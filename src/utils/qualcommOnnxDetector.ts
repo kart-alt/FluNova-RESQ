@@ -48,6 +48,12 @@ export const SKELETON_CONNECTIONS: [number, number][] = [
   [11, 13], [13, 15], [12, 14], [14, 16]
 ]
 
+export const KEYPOINT_NAMES = [
+  'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+  'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
+  'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
+]
+
 export interface DetectorMetrics {
   inferenceTimeMs: number
   fps: number
@@ -133,7 +139,7 @@ class QualcommOnnxDetector {
   /**
    * Initializes detector: Checks local Python server, loads in-browser ONNX model
    */
-  public async initialize(modelPathOrBuffer: string | ArrayBuffer = '/models/yolov8n.onnx'): Promise<boolean> {
+  public async initialize(modelPathOrBuffer: string | ArrayBuffer = '/models/yolov8n-pose.onnx'): Promise<boolean> {
     if (this.isInitializing) return this.isReady
     this.isInitializing = true
     this.loadError = null
@@ -344,7 +350,7 @@ class QualcommOnnxDetector {
   }
 
   /**
-   * Parses raw YOLOv8 output shape (1, 84, 8400) and applies Non-Maximum Suppression (NMS).
+   * Parses raw YOLOv8/YOLO-Pose output shape ([1, 56, 8400] or [1, 84, 8400]) and applies NMS.
    */
   private postprocessYOLOv8(
     outputData: Float32Array,
@@ -352,6 +358,8 @@ class QualcommOnnxDetector {
     targetClassIds: number[]
   ): DetectedObject[] {
     const numCandidates = 8400
+    const totalChannels = Math.round(outputData.length / numCandidates)
+    const isPoseModel = totalChannels === 56
 
     interface CandidateBox {
       x1: number
@@ -360,6 +368,7 @@ class QualcommOnnxDetector {
       y2: number
       score: number
       classId: number
+      candidateIdx: number
     }
 
     const candidates: CandidateBox[] = []
@@ -368,16 +377,22 @@ class QualcommOnnxDetector {
       let maxScore = 0
       let maxClassId = 0
 
-      for (const targetId of targetClassIds) {
-        const score = outputData[(4 + targetId) * numCandidates + c]
-        if (score > maxScore) {
-          maxScore = score
-          maxClassId = targetId
+      if (isPoseModel) {
+        // Channel 4 is the Person class confidence in YOLOv8 Pose model
+        maxScore = outputData[4 * numCandidates + c]
+        maxClassId = 0
+      } else {
+        for (const targetId of targetClassIds) {
+          const score = outputData[(4 + targetId) * numCandidates + c]
+          if (score > maxScore) {
+            maxScore = score
+            maxClassId = targetId
+          }
         }
       }
 
       // Aerial drone view adaptation: top-down person perspective has lower peak score in COCO models
-      const effectiveThreshold = maxClassId === 0 ? Math.min(confThreshold, 0.07) : confThreshold
+      const effectiveThreshold = maxClassId === 0 ? Math.min(confThreshold, 0.15) : confThreshold
 
       if (maxScore >= effectiveThreshold) {
         const cx = outputData[0 * numCandidates + c]
@@ -397,6 +412,7 @@ class QualcommOnnxDetector {
           y2,
           score: maxScore,
           classId: maxClassId,
+          candidateIdx: c,
         })
       }
     }
@@ -430,8 +446,8 @@ class QualcommOnnxDetector {
       const heightPct = ((box.y2 - box.y1) / 640) * 100
       const confPct = Math.min(99, Math.round(box.score * 100))
 
-      let label = 'OBJECT'
-      let heatPattern: 'HUMAN_CORE' | 'METABOLIC_ACTIVE' = 'METABOLIC_ACTIVE'
+      let label = 'SURVIVOR [PERSON]'
+      let heatPattern: 'HUMAN_CORE' | 'METABOLIC_ACTIVE' = 'HUMAN_CORE'
       let tempC = Number((36.2 + (box.score * 1.1)).toFixed(1))
       let posture = 'STANDING'
       let isDistress = false
@@ -440,6 +456,25 @@ class QualcommOnnxDetector {
         type: 'NONE',
         severity: 'LOW',
         message: 'Ambulatory individual observed.',
+      }
+
+      // Extract real 17-keypoint skeleton if Pose model
+      let keypoints: Keypoint[] = []
+      if (isPoseModel && box.classId === 0) {
+        for (let k = 0; k < 17; k++) {
+          const kx = outputData[(5 + k * 3) * numCandidates + box.candidateIdx]
+          const ky = outputData[(5 + k * 3 + 1) * numCandidates + box.candidateIdx]
+          const kc = outputData[(5 + k * 3 + 2) * numCandidates + box.candidateIdx]
+          keypoints.push({
+            id: k,
+            name: KEYPOINT_NAMES[k] || `pt_${k}`,
+            x: Number(((kx / 640) * 100).toFixed(2)),
+            y: Number(((ky / 640) * 100).toFixed(2)),
+            conf: Number(kc.toFixed(2)),
+          })
+        }
+      } else if (box.classId === 0) {
+        keypoints = this.generateKeypoints(leftPct, topPct, widthPct, heightPct, posture)
       }
 
       if (box.classId === 0) {
@@ -453,8 +488,19 @@ class QualcommOnnxDetector {
             severity: 'CRITICAL',
             message: 'Unconscious person detected in prone posture at ground level. Urgent medical triage required.',
           }
-          label = 'SURVIVOR [PRONE / LYING]'
+          label = `S-${idx + 1} [PRONE / LYING]`
           tempC = Number((35.8 + (box.score * 0.8)).toFixed(1))
+        } else if (keypoints.length === 17 && (keypoints[9].y < keypoints[5].y - 1.5 || keypoints[10].y < keypoints[6].y - 1.5)) {
+          posture = 'CALLING_FOR_HELP'
+          isDistress = true
+          hazard = {
+            detected: true,
+            type: 'ACTIVE DISTRESS SIGNAL',
+            severity: 'HIGH',
+            message: 'Survivor actively signaling / waving for aerial assistance.',
+          }
+          label = `S-${idx + 1} [WAVING / DISTRESS]`
+          tempC = Number((36.9 + (box.score * 0.5)).toFixed(1))
         } else if (aspect >= 0.85 && heightPct < 22) {
           posture = 'CROUCHING_TRAPPED'
           isDistress = true
@@ -464,22 +510,11 @@ class QualcommOnnxDetector {
             severity: 'HIGH',
             message: 'Individual crouching / trapped near debris; potential entrapment or restricted mobility.',
           }
-          label = 'SURVIVOR [CROUCHING / TRAPPED]'
+          label = `S-${idx + 1} [CROUCHING / TRAPPED]`
           tempC = Number((36.2 + (box.score * 0.6)).toFixed(1))
-        } else if (idx % 2 === 0) {
-          posture = 'CALLING_FOR_HELP'
-          isDistress = true
-          hazard = {
-            detected: true,
-            type: 'ACTIVE DISTRESS SIGNAL',
-            severity: 'HIGH',
-            message: 'Survivor actively signaling / waving for aerial assistance.',
-          }
-          label = 'SURVIVOR [WAVING / DISTRESS]'
-          tempC = Number((36.9 + (box.score * 0.5)).toFixed(1))
         } else {
           posture = 'STANDING'
-          label = 'SURVIVOR [PERSON]'
+          label = `S-${idx + 1} [PERSON]`
           tempC = Number((36.6 + (box.score * 0.4)).toFixed(1))
         }
         heatPattern = 'HUMAN_CORE'
@@ -495,12 +530,10 @@ class QualcommOnnxDetector {
         label = (COCO_CLASSES[box.classId] || 'OBJECT').toUpperCase()
       }
 
-      // Generate 17 keypoint wireframe coordinates
-      const keypoints = box.classId === 0 ? this.generateKeypoints(leftPct, topPct, widthPct, heightPct, posture) : []
-
       const isPerson = box.classId === 0
       return {
-        id: `DET-QAI-${idx + 1}`,
+        id: `S-${idx + 1}`,
+        trackId: idx + 1,
         label,
         classId: box.classId,
         className: isPerson ? 'person' : (box.classId === 2 ? 'rescue_vehicle' : 'rescue_truck'),
@@ -519,7 +552,7 @@ class QualcommOnnxDetector {
         hazard,
         keypoints,
         skeletonLines: SKELETON_CONNECTIONS,
-        modelSource: 'Qualcomm AI Hub YOLO26-Pose',
+        modelSource: isPoseModel ? 'Qualcomm AI Hub YOLO26-Pose (WASM)' : 'Qualcomm AI Hub YOLO26-Detection (WASM)',
         aiHubUrl: 'https://aihub.qualcomm.com/models/yolo26_pose',
       }
     })
