@@ -2,7 +2,7 @@ import * as ort from 'onnxruntime-web'
 
 if (typeof window !== 'undefined') {
   try {
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/'
+    ort.env.wasm.wasmPaths = '/onnx/'
     ort.env.wasm.numThreads = 1
     ort.env.wasm.proxy = false
   } catch (e) {
@@ -78,13 +78,13 @@ const COCO_CLASSES = [
 ]
 
 class QualcommOnnxDetector {
-  private inputSize = 416
+  private inputSize = 320
   private session: ort.InferenceSession | null = null
   private canvas: HTMLCanvasElement | null = null
   private ctx: CanvasRenderingContext2D | null = null
   private tensorCanvas: HTMLCanvasElement | null = null
   private tensorCtx: CanvasRenderingContext2D | null = null
-  private tensorDataBuffer = new Float32Array(3 * 416 * 416)
+  private tensorDataBuffer = new Float32Array(3 * 320 * 320)
 
   private isInitializing = false
   private isProcessingFrame = false
@@ -109,8 +109,8 @@ class QualcommOnnxDetector {
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
       this.tensorCanvas = document.createElement('canvas')
-      this.tensorCanvas.width = 416
-      this.tensorCanvas.height = 416
+      this.tensorCanvas.width = 320
+      this.tensorCanvas.height = 320
       this.tensorCtx = this.tensorCanvas.getContext('2d', { willReadFrequently: true })
 
       this.startServerPoller()
@@ -180,7 +180,7 @@ class QualcommOnnxDetector {
       }
 
       const options: ort.InferenceSession.SessionOptions = {
-        executionProviders: ['webgpu', 'wasm'],
+        executionProviders: ['wasm'],
         graphOptimizationLevel: 'all',
       }
 
@@ -216,7 +216,7 @@ class QualcommOnnxDetector {
     confidenceThreshold = 0.15,
     targetClassIds: number[] = [0, 2, 7]
   ): Promise<DetectedObject[]> {
-    if (this.isProcessingFrame || !this.canvas || !this.ctx) {
+    if (this.isProcessingFrame || !this.tensorCanvas || !this.tensorCtx) {
       return this.lastDetections
     }
 
@@ -234,20 +234,20 @@ class QualcommOnnxDetector {
     const startTime = performance.now()
 
     try {
-      const naturalW = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth
-      const naturalH = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight
-      const targetW = Math.min(480, naturalW || 480)
-      const targetH = Math.round((targetW / (naturalW || 16)) * (naturalH || 9))
-
-      if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
-        this.canvas.width = targetW
-        this.canvas.height = targetH
-      }
-
-      this.ctx.drawImage(media, 0, 0, targetW, targetH)
-
       // Step 1: Query local Qualcomm AI Hub YOLOv8 Detection Server ONLY on localhost HTTP
-      if (this.serverOnline && this.isLocalhost()) {
+      if (this.serverOnline && this.isLocalhost() && this.canvas && this.ctx) {
+        const naturalW = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth
+        const naturalH = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight
+        const targetW = Math.min(480, naturalW || 480)
+        const targetH = Math.round((targetW / (naturalW || 16)) * (naturalH || 9))
+
+        if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+          this.canvas.width = targetW
+          this.canvas.height = targetH
+        }
+
+        this.ctx.drawImage(media, 0, 0, targetW, targetH)
+
         try {
           const blob = await new Promise<Blob | null>(resolve => {
             this.canvas!.toBlob(resolve, 'image/jpeg', 0.55)
@@ -278,9 +278,9 @@ class QualcommOnnxDetector {
         }
       }
 
-      // Step 2: Client-side ONNX Inference Session Fallback
+      // Step 2: Client-side ONNX Inference Session Fallback (Single-pass WASM)
       if (this.session) {
-        const tensor = this.preprocessCanvasToTensor()
+        const tensor = this.preprocessMediaToTensor(media)
         if (tensor) {
           const inputName = this.session.inputNames[0] || 'images'
           const feeds: Record<string, ort.Tensor> = { [inputName]: tensor }
@@ -337,13 +337,13 @@ class QualcommOnnxDetector {
   }
 
   /**
-   * Preprocesses canvas image into normalized [1, 3, inputSize, inputSize] tensor for ONNX runtime
+   * Preprocesses video/image directly into normalized [1, 3, inputSize, inputSize] tensor in single draw pass
    */
-  private preprocessCanvasToTensor(): ort.Tensor | null {
-    if (!this.canvas || !this.tensorCanvas || !this.tensorCtx) return null
+  private preprocessMediaToTensor(media: HTMLVideoElement | HTMLImageElement): ort.Tensor | null {
+    if (!this.tensorCanvas || !this.tensorCtx) return null
 
     const size = this.inputSize
-    this.tensorCtx.drawImage(this.canvas, 0, 0, size, size)
+    this.tensorCtx.drawImage(media, 0, 0, size, size)
     const imgData = this.tensorCtx.getImageData(0, 0, size, size)
     const data = imgData.data
 
@@ -351,11 +351,14 @@ class QualcommOnnxDetector {
     const planeSize = size * size
     const inv255 = 1.0 / 255.0
 
-    for (let i = 0; i < planeSize; i++) {
-      const idx = i * 4
-      floatArr[i] = data[idx] * inv255
-      floatArr[planeSize + i] = data[idx + 1] * inv255
-      floatArr[planeSize * 2 + i] = data[idx + 2] * inv255
+    const p1 = 0
+    const p2 = planeSize
+    const p3 = planeSize * 2
+
+    for (let i = 0, j = 0; i < planeSize; i++, j += 4) {
+      floatArr[p1 + i] = data[j] * inv255
+      floatArr[p2 + i] = data[j + 1] * inv255
+      floatArr[p3 + i] = data[j + 2] * inv255
     }
 
     return new ort.Tensor('float32', floatArr, [1, 3, size, size])
@@ -369,10 +372,10 @@ class QualcommOnnxDetector {
     confThreshold: number,
     targetClassIds: number[]
   ): DetectedObject[] {
-    const totalChannels = outputData.length >= 8400 * 56 ? 56 : (outputData.length >= 3549 * 56 && outputData.length < 3549 * 84 ? 56 : (outputData.length % 56 === 0 ? 56 : 84))
+    const totalChannels = outputData.length % 56 === 0 ? 56 : 84
     const numCandidates = Math.round(outputData.length / totalChannels)
     const isPoseModel = totalChannels === 56
-    const normSize = this.inputSize || 416
+    const normSize = this.inputSize || 320
 
     interface CandidateBox {
       x1: number
