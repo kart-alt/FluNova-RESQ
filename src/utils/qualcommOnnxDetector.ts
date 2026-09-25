@@ -117,8 +117,14 @@ class QualcommOnnxDetector {
     }
   }
 
+  private isLocalhost(): boolean {
+    if (typeof window === 'undefined') return false
+    return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+      window.location.protocol === 'http:'
+  }
+
   private startServerPoller() {
-    if (this.pingInterval) return
+    if (!this.isLocalhost() || this.pingInterval) return
     this.pingInterval = setInterval(async () => {
       try {
         const ping = await fetch('http://127.0.0.1:8000/status', {
@@ -145,18 +151,22 @@ class QualcommOnnxDetector {
     this.isInitializing = true
     this.loadError = null
 
-    // Check local high-performance Python YOLO26-Pose AI Hub server
-    try {
-      const ping = await fetch('http://127.0.0.1:8000/status', {
-        signal: AbortSignal.timeout(800)
-      })
-      if (ping.ok) {
-        const info = await ping.json()
-        this.serverOnline = true
-        this.modelName = info.model || 'Qualcomm AI Hub YOLO26-Pose (Snapdragon NPU SIMD Engine)'
-        console.log('✅ Connected to Qualcomm AI Hub YOLO26-Pose Server (Snapdragon NPU SIMD Engine)')
+    // Check local high-performance Python YOLO26-Pose AI Hub server ONLY on localhost HTTP
+    if (this.isLocalhost()) {
+      try {
+        const ping = await fetch('http://127.0.0.1:8000/status', {
+          signal: AbortSignal.timeout(800)
+        })
+        if (ping.ok) {
+          const info = await ping.json()
+          this.serverOnline = true
+          this.modelName = info.model || 'Qualcomm AI Hub YOLO26-Pose (Snapdragon NPU SIMD Engine)'
+          console.log('✅ Connected to Qualcomm AI Hub YOLO26-Pose Server (Snapdragon NPU SIMD Engine)')
+        }
+      } catch {
+        this.serverOnline = false
       }
-    } catch {
+    } else {
       this.serverOnline = false
     }
 
@@ -236,8 +246,8 @@ class QualcommOnnxDetector {
 
       this.ctx.drawImage(media, 0, 0, targetW, targetH)
 
-      // Step 1: Query local Qualcomm AI Hub YOLOv8 Detection Server if online
-      if (this.serverOnline) {
+      // Step 1: Query local Qualcomm AI Hub YOLOv8 Detection Server ONLY on localhost HTTP
+      if (this.serverOnline && this.isLocalhost()) {
         try {
           const blob = await new Promise<Blob | null>(resolve => {
             this.canvas!.toBlob(resolve, 'image/jpeg', 0.55)
